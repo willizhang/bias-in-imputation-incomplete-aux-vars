@@ -1,0 +1,597 @@
+---
+title: "Sexual Identity Change, SPHC 2010 Followed Up Until 2014"
+author: Willi Zhang, Maya Mathur
+email: willi.zhang@ki.se
+output: html_notebook
+editor_options: 
+  chunk_output_type: console
+---
+
+### 1. Load Packages
+```{r}
+library(ggdag)
+library(ggplot2)
+library(tidyverse)
+library(naniar)
+library(haven)
+library(finalfit)
+library(mice)
+library(iai)
+```
+
+### 2. Sexual identities at T1 and T2
+```{r}
+theme_set( theme_dag() + theme( strip.text = element_blank() ) )
+
+coords <- tibble::tribble(
+  ~ name,                          ~ x,     ~ y,
+  "sexual_identity_t1",            0.25,       0.50,
+  "sexual_identity_t2",            0.75,       0.50,
+  "sexual_identity_t2_incomplete", 0.85,       0.50,
+  "r_sexual_identity_t2",          0.75,       0.25,
+  "occupation",                    0.50,       0.25,
+  "occupation_incomplete",         0.70,       0.10,
+  "r_occupation",                  0.50,       0.10,
+  "education",                     0.40,       0.75
+  )
+
+set.seed( 123 )
+sexual_identity_change_dag <- dagify(
+  
+  sexual_identity_t2 ~ sexual_identity_t1 + occupation + education,
+  occupation ~ sexual_identity_t1 + education,
+  education ~ sexual_identity_t1,
+  occupation_incomplete ~ occupation + r_occupation,
+  sexual_identity_t2_incomplete ~ sexual_identity_t2 + r_sexual_identity_t2,
+  r_sexual_identity_t2 ~ sexual_identity_t1 + occupation + education,
+  r_occupation ~ sexual_identity_t1 + education,
+  
+  labels = c(
+    "sexual_identity_t1" = "sexual_identity_t1",
+    "sexual_identity_t2" = "sexual_identity_t2",
+    "sexual_identity_t2_incomplete" = "sexual_identity_t2_incomplete",
+    "r_sexual_identity_t2" = "r_sexual_identity_t2",
+    "occupation" = "occupation",
+    "occupation_incomplete" = "occupation_incomplete",
+    "r_occupation" = "r_occupation",
+    "education" = "education"
+    ),
+  
+  coords = coords
+  
+  )
+
+p1 <- ggdag( sexual_identity_change_dag, 
+             text = FALSE, 
+             use_labels = "label"
+             )
+p1
+ggsave( "dag_sexual_identity_change.jpeg", plot = p1, width = 10, height = 7, dpi = 600 )
+```
+
+### 3. SPHC 2010, followed up to 2014
+```{r}
+load('/Volumes/projects/LGBT Project data/d_2010.RData')
+
+# sexual identity in 2010
+table( d_2010$F10U87G78, useNA = "always" )
+d_2010$F10U87G78[ d_2010$F10U87G78 == 9 ] <- NA
+d_2010$sexual_identity_2010 <- factor( ifelse( d_2010$F10U87G78 == 1, "Heterosexual", "Non-heterosexual" ),
+                                       levels = c( "Heterosexual", "Non-heterosexual" ) )
+table( d_2010$sexual_identity_2010, useNA = "always" )
+
+# sexual identity in 2014
+table( d_2010$F14F103, useNA = "always" )
+d_2010$sexual_identity_2014 <- factor( ifelse( d_2010$F14F103 == 1, "Heterosexual", "Non-heterosexual" ),
+                                       levels = c( "Heterosexual", "Non-heterosexual" ) )
+table( d_2010$sexual_identity_2014, useNA = "always" )
+
+# change in sexual identity
+d_2010$identity_change <- ifelse( d_2010$sexual_identity_2010 == d_2010$sexual_identity_2014, 0, 1 )
+table( d_2010$identity_change, useNA = "always" )
+
+# age
+summary( d_2010$F10alder )
+d_2010$age_2010 <- d_2010$F10alder
+
+# sex
+table( d_2010$kon, useNA = "always" )
+d_2010$sex <- factor( ifelse( d_2010$kon == 1, "Male", "Female" ),
+                      levels = c( "Male", "Female" ) )
+table( d_2010$sex, useNA = "always" )
+
+# country of birth
+table( d_2010$fodelseland, useNA = "always" )
+d_2010$country_of_birth <- factor( ifelse( d_2010$fodelseland == "Sverige", "Sweden",
+                                           ifelse( d_2010$fodelseland == "Europa", "Europe", "Outside Europe" ) ),
+                                   levels = c( "Sweden", "Europe", "Outside Europe" ) )
+table( d_2010$country_of_birth, useNA = "always" )
+
+# education
+table( d_2010$utbniva2010, useNA = "always" )
+d_2010$education_2010 <- factor( ifelse( d_2010$utbniva2010 <= 2, "<=9 years",
+                                    ifelse( d_2010$utbniva2010 <= 4, "10-12 years", ">=13 years" ) ), 
+                            levels = c( "<=9 years", "10-12 years", ">=13 years" ) )
+table( d_2010$education_2010, useNA = "always" )
+
+# occupation
+table( d_2010$SSYK_kl, useNA = "always" )
+d_2010$occupation_2010 <- factor(
+  ifelse(
+    d_2010$SSYK_kl == "Yrken inom byggverksamhet och tillverkning" |
+      d_2010$SSYK_kl == "Yrken inom lantbruk, trädgård, skogsbruk och fiske" |
+      d_2010$SSYK_kl == "Yrken inom maskinell tillverkning och transport m.m.",
+    "Manual and field trades",
+    ifelse(
+      d_2010$SSYK_kl == "Service-, omsorgs- och försäljningsyrken" |
+        d_2010$SSYK_kl == "Yrken inom administration och kundtjänst" |
+        d_2010$SSYK_kl == "Yrken med krav på kortare utbildning eller introduktion",
+      "Service and support",
+      ifelse(
+        d_2010$SSYK_kl == "Yrken med krav på fördjupad högskolekompetens" |
+          d_2010$SSYK_kl == "Yrken med krav på högskolekompetens eller motsvarande" |
+          d_2010$SSYK_kl == "Chefsyrken" |
+          d_2010$SSYK_kl == "Militära yrken",
+        "Expertise and leadership",
+        NA
+      )
+    )
+  ),
+  levels = c(
+    "Manual and field trades",
+    "Service and support",
+    "Expertise and leadership"
+  )
+)
+table( d_2010$occupation_2010, useNA = "always" )
+
+
+d_2010_prelim <- d_2010 %>% 
+  select( "sexual_identity_2010", "sexual_identity_2014", "identity_change", "age_2010", "sex", "country_of_birth", "education_2010", "occupation_2010" )
+summary( d_2010_prelim )
+miss_var_summary( d_2010_prelim ) # 41.2% in sexual_identity_2014, 18.3% in occupation_2010, 3.8% in sexual_identity_2010, 0.7% in education_2010
+
+# among participants in 2014 (N = 18,518), 431 (2.3%) did not report sexual identity. Therefore, the missingness in sexual_identity_2014 was primarily due to loss to follow-up
+
+# select study sample
+d_2010_selected <- d_2010_prelim %>%
+  filter( age_2010 >= 25 & age_2010 <= 45 ) # select participants aged 25-45 at baseline, because this age group, relative to younger individuals, would be relatively stable socioeconomically
+summary( d_2010_selected )
+nrow( d_2010_selected ) # 10,063
+miss_var_summary( d_2010_selected ) # 45.9% in sexual_identity_2014, 6.7% in occupation_2010, 2.3% in sexual_identity_2010, 0.3% in education_2010
+
+d_2010_selected_final <- d_2010_selected %>% 
+  filter( !is.na( sexual_identity_2010 ), !is.na( education_2010 ) ) # remove 2.3% missingness in sexual_identity_2010 and 0.3% in education_2010
+summary( d_2010_selected_final )
+nrow( d_2010_selected_final ) # 9,806
+miss_var_summary( d_2010_selected_final ) # 45.1% in sexual_identity_2014, 6.3% in occupation_2010
+
+
+# characteristics table
+explanatory =  c( "sexual_identity_2014", "sex", "age_2010", "country_of_birth", "education_2010", "occupation_2010" )
+dependent = "sexual_identity_2010"
+
+d_2010_table <- d_2010_selected_final %>%
+  summary_factorlist( dependent,
+                      explanatory, 
+                      na_include = TRUE,
+                      na_include_dependent = TRUE, 
+                      total_col = TRUE,
+                      add_col_totals = TRUE,
+                      column = TRUE )
+
+d_2010_table
+
+
+# correlation of sexual identities in 2010 and 2014
+ggplot( d_2010_selected_final %>% filter( !is.na( sexual_identity_2014 ) ),
+        aes( x = sexual_identity_2010, fill = sexual_identity_2014 ) ) +
+  geom_bar( position = "fill" ) +
+  scale_y_continuous( labels = scales::percent ) +
+  labs( x = "Sexual Identity in 2010", y = "Percentage", fill = "Sexual Identity in 2014" ) +
+  theme_classic()
+
+# correlation of sexual identity in 2010 and missingness of sexual identity in 2014
+ggplot( d_2010_selected_final,
+        aes( x = sexual_identity_2010, fill = is.na( sexual_identity_2014 ) ) ) +
+  geom_bar( position = "fill" ) +
+  scale_y_continuous( labels = scales::percent ) +
+  labs( x = "Sexual Identity in 2010", y = "Percentage", fill = "Missingness of Sexual Identity in 2014" ) +
+  theme_classic()
+
+# correlation of sexual identity in 2010 and education
+ggplot( d_2010_selected_final,
+        aes( x = education_2010, fill = sexual_identity_2010 ) ) +
+  geom_bar( position = "fill" ) +
+  scale_y_continuous( labels = scales::percent ) +
+  labs( x = "Education Year", y = "Percentage", fill = "Sexual Identity in 2010" ) +
+  theme_classic()
+
+# correlation of sexual identity in 2010 and occupation
+ggplot( d_2010_selected_final %>% filter( !is.na( occupation_2010 ) ),
+        aes( x = sexual_identity_2010, fill = occupation_2010 ) ) +
+  geom_bar( position = "fill" ) +
+  scale_y_continuous( labels = scales::percent ) +
+  labs( x = "Sexual Identity in 2010", y = "Percentage", fill = "Occupation" ) +
+  theme_classic()
+
+# correlation of sexual identity in 2010 and missingness of occupation
+ggplot( d_2010_selected_final,
+        aes( x = sexual_identity_2010, fill = is.na( occupation_2010 ) ) ) +
+  geom_bar( position = "fill" ) +
+  scale_y_continuous( labels = scales::percent ) +
+  labs( x = "Sexual Identity in 2010", y = "Percentage", fill = "Missingness of Occupation" ) +
+  theme_classic()
+
+# correlation of education and sexual identity in 2014
+ggplot( d_2010_selected_final %>% 
+          filter( !is.na( sexual_identity_2014 ) ),
+        aes( x = education_2010, fill = sexual_identity_2014 ) ) +
+  geom_bar( position = "fill" ) +
+  scale_y_continuous( labels = scales::percent ) +
+  labs( x = "Education Year", y = "Percentage", fill = "Sexual Identity in 2014" ) +
+  theme_classic()
+
+# correlation of education and missingness of sexual identity in 2014
+ggplot( d_2010_selected_final,
+        aes( x = education_2010, fill = is.na( sexual_identity_2014 ) ) ) +
+  geom_bar( position = "fill" ) +
+  scale_y_continuous( labels = scales::percent ) +
+  labs( x = "Education Year", y = "Percentage", fill = "Missingness of Sexual Identity in 2014" ) +
+  theme_classic()
+
+# correlation of education and occupation
+ggplot( d_2010_selected_final %>% filter( !is.na( occupation_2010 ) ),
+        aes( x = education_2010, fill = occupation_2010 ) ) +
+  geom_bar( position = "fill" ) +
+  scale_y_continuous( labels = scales::percent ) +
+  labs( x = "Education Year", y = "Percentage", fill = "Occupation" ) +
+  theme_classic()
+
+# correlation of education and missingness of occupation
+ggplot( d_2010_selected_final,
+        aes( x = education_2010, fill = is.na( occupation_2010 ) ) ) +
+  geom_bar( position = "fill" ) +
+  scale_y_continuous( labels = scales::percent ) +
+  labs( x = "Education Year", y = "Percentage", fill = "Missingness of Occupation" ) +
+  theme_classic()
+
+# correlation of occupation and sexual identity in 2014
+ggplot( d_2010_selected_final %>% 
+          filter( !is.na( sexual_identity_2014 ) & !is.na( occupation_2010 ) ),
+        aes( x = sexual_identity_2014, fill = occupation_2010 ) ) +
+  geom_bar( position = "fill" ) +
+  scale_y_continuous( labels = scales::percent ) +
+  labs( x = "Sexual Identity in 2014", y = "Percentage", fill = "Occupation" ) +
+  theme_classic()
+
+# correlation of occupation and missingness of sexual identity in 2014
+ggplot( d_2010_selected_final %>%
+          filter( !is.na( occupation_2010 ) ),
+        aes( x = occupation_2010, fill = is.na( sexual_identity_2014 ) ) ) +
+  geom_bar( position = "fill" ) +
+  scale_y_continuous( labels = scales::percent ) +
+  labs( x = "Occupation", y = "Percentage", fill = "Missingness of Sexual Identity in 2014" ) +
+  theme_classic()
+```
+
+### 4. Complete-case analysis
+```{r}
+d_cc <- d_2010_selected_final %>% filter( !is.na( identity_change )  )
+nrow( d_cc )
+summary( d_cc )
+
+model_cc <- glm( identity_change ~ sexual_identity_2010, 
+                 family = binomial( link = "log" ), 
+                 data = d_cc )
+
+tidy_cc <- tidy( model_cc, conf.int = TRUE, conf.level = 0.95 )
+tidy_cc
+
+model_cc <- tibble(
+    "Estimate (log RR)" = round( tidy_cc[[ 2, "estimate" ]], 3 ), 
+    "SE" = round( tidy_cc[[ 2, "std.error" ]], 3 ),
+    "Lower CI" = round( tidy_cc[[ 2, "conf.low" ]], 3 ),
+    "Upper CI" = round( tidy_cc[[ 2, "conf.high" ]], 3 ),
+    
+    "RR [95% CI]" = paste0(
+      round( exp( tidy_cc[[ 2, "estimate" ]] ), 2 ), " [",
+      round( exp( tidy_cc[[ 2, "conf.low" ]] ), 2 ), ", ",
+      round( exp( tidy_cc[[ 2, "conf.high" ]] ), 2 ), "]" )
+    )
+
+model_cc[["Imputation Model"]] <- "Complete-case analysis"
+model_cc
+```
+
+### 5. AF4 Method
+```{r}
+# modeled auxiliary variables: age, sex, country of birth
+
+d_clean <- d_2010_selected_final %>%
+  mutate(
+    sex_bin = ifelse( sex == "Female", 1, 0 ),
+    Y = identity_change  # rename for Y_model
+    )
+summary( d_clean )
+
+set.seed( 123 )
+af4_model <- af4( data = d_clean,
+                  X_names = c( "sexual_identity_2010" ), 
+                  X_values_1 = c( "Non-heterosexual" ),
+                  X_values_2 = c( "Heterosexual" ),
+                  contrast_type = "ratio",
+                  Y_model = Y ~ sexual_identity_2010,
+                  W_model = list(
+                    age_2010 ~ sexual_identity_2010,
+                    sex_bin ~ sexual_identity_2010 + age_2010,
+                    country_of_birth ~ sexual_identity_2010 + age_2010
+                    ) )
+af4_model
+
+set.seed( 123 )
+get_CI( af4_model, n_boot = 100, type = 'perc' )
+```
+
+```{r}
+set.seed( 123 )
+af4_model <- af4( data = d_2010_selected_final %>% rename( Y = identity_change ),
+                  X_names = c( "sexual_identity_2010" ), 
+                  X_values_1 = c( "Non-heterosexual" ),
+                  X_values_2 = c( "Heterosexual" ),
+                  contrast_type = "ratio",
+                  Y_model = Y ~ sexual_identity_2010,
+                  W_model = list(
+                    age_2010 ~ sexual_identity_2010,
+                    country_of_birth ~ sexual_identity_2010 + age_2010,
+                    education_2010 ~ sexual_identity_2010 + age_2010 + country_of_birth,
+                    occupation_2010 ~ sexual_identity_2010 + age_2010 + country_of_birth + education_2010
+                    ) )
+af4_model
+
+set.seed( 123 )
+get_CI( af4_model, n_boot = 100, type = 'perc' )
+```
+
+
+### 6. MICE
+#### 6.2.1 Model 1
+```{r}
+# only include sexual identity
+
+impute_data_1 <- d_2010_selected_final %>%
+  select( sexual_identity_2010, sexual_identity_2014 )
+summary( impute_data_1 )
+str( impute_data_1 )
+miss_var_summary( impute_data_1  )
+
+imp_1 <- mice( impute_data_1, m = 50, seed = 123, print = FALSE )
+summary( imp_1 )
+plot( imp_1 )
+
+long_data_1 <- complete( imp_1, action = "long", include = TRUE )
+long_data_1$identity_change <- ifelse( long_data_1$sexual_identity_2010 == long_data_1$sexual_identity_2014, 0, 1 )
+summary( long_data_1 )
+
+fit_model_1 <- with( as.mids( long_data_1 ),
+                     glm( identity_change ~ sexual_identity_2010, family = binomial( link = "log" ) ) )
+
+pooled_summary_1 <- summary( pool( fit_model_1 ), conf.int = TRUE )
+pooled_summary_1
+
+model_1 <- tibble(
+    "Estimate (log RR)" = round( pooled_summary_1[[ 2, "estimate" ]], 3 ), 
+    "SE" = round( pooled_summary_1[[ 2, "std.error" ]], 3 ),
+    "Lower CI" = round( pooled_summary_1[[ 2, "conf.low" ]], 3 ),
+    "Upper CI" = round( pooled_summary_1[[ 2, "conf.high" ]], 3 ),
+    
+    "RR [95% CI]" = paste0(
+      round( exp( pooled_summary_1[[ 2, "estimate" ]] ), 2 ), " [",
+      round( exp( pooled_summary_1[[ 2, "conf.low" ]] ), 2 ), ", ",
+      round( exp( pooled_summary_1[[ 2, "conf.high" ]] ), 2 ), "]" )
+    )
+model_1[["Imputation Model"]] <- "Model 1: sexual identity"
+model_1
+```
+
+#### 5.2.2. Model 2
+```{r}
+# additionally include age, sex, and country of birth
+
+impute_data_2 <- d_2010_selected_final %>%
+  select( sexual_identity_2010, sexual_identity_2014, age_2010, country_of_birth )
+summary( impute_data_2 )
+str( impute_data_2 )
+miss_var_summary( impute_data_2  )
+
+imp_2 <- mice( impute_data_2, m = 50, seed = 123, print = FALSE )
+summary( imp_2 )
+plot( imp_2 )
+
+long_data_2 <- complete( imp_2, action = "long", include = TRUE )
+long_data_2$identity_change <- ifelse( long_data_2$sexual_identity_2010 == long_data_2$sexual_identity_2014, 0, 1 )
+summary( long_data_2 )
+
+fit_model_2 <- with( as.mids( long_data_2 ),
+                     glm( identity_change ~ sexual_identity_2010, family = binomial( link = "log" ) ) )
+
+pooled_summary_2 <- summary( pool( fit_model_2 ), conf.int = TRUE )
+pooled_summary_2
+
+model_2 <- tibble(
+  "Estimate (log RR)" = round( pooled_summary_2[[ 2, "estimate" ]], 3 ), 
+  "SE" = round( pooled_summary_2[[ 2, "std.error" ]], 3 ),
+  "Lower CI" = round( pooled_summary_2[[ 2, "conf.low" ]], 3 ),
+  "Upper CI" = round( pooled_summary_2[[ 2, "conf.high" ]], 3 ),
+  
+  "RR [95% CI]" = paste0(
+    round( exp( pooled_summary_2[[ 2, "estimate" ]] ), 2 ), " [",
+    round( exp( pooled_summary_2[[ 2, "conf.low" ]] ), 2 ), ", ",
+    round( exp( pooled_summary_2[[ 2, "conf.high" ]] ), 2 ), "]" )
+)
+model_2[["Imputation Model"]] <- "Model 2: sexual identity, age, sex, country of birth"
+model_2
+```
+
+#### 5.2.3. Model 3
+```{r}
+# additionally include age, sex, country of birth, and education
+
+impute_data_3 <- d_2010_selected_final %>%
+  select( sexual_identity_2010, sexual_identity_2014, age_2010, sex, country_of_birth, education_2010 )
+summary( impute_data_3 )
+str( impute_data_3 )
+miss_var_summary( impute_data_3  )
+
+imp_3 <- mice( impute_data_3, m = 50, seed = 123, print = FALSE )
+summary( imp_3 )
+plot( imp_3 )
+
+long_data_3 <- complete( imp_3, action = "long", include = TRUE )
+long_data_3$identity_change <- ifelse( long_data_3$sexual_identity_2010 == long_data_3$sexual_identity_2014, 0, 1 )
+summary( long_data_3 )
+
+fit_model_3 <- with( as.mids( long_data_3 ),
+                     glm( identity_change ~ sexual_identity_2010, family = binomial( link = "log" ) ) )
+
+pooled_summary_3 <- summary( pool( fit_model_3 ), conf.int = TRUE )
+pooled_summary_3
+
+model_3 <- tibble(
+  "Estimate (log RR)" = round( pooled_summary_3[[ 2, "estimate" ]], 3 ), 
+  "SE" = round( pooled_summary_3[[ 2, "std.error" ]], 3 ),
+  "Lower CI" = round( pooled_summary_3[[ 2, "conf.low" ]], 3 ),
+  "Upper CI" = round( pooled_summary_3[[ 2, "conf.high" ]], 3 ),
+  
+  "RR [95% CI]" = paste0(
+    round( exp( pooled_summary_3[[ 2, "estimate" ]] ), 2 ), " [",
+    round( exp( pooled_summary_3[[ 2, "conf.low" ]] ), 2 ), ", ",
+    round( exp( pooled_summary_3[[ 2, "conf.high" ]] ), 2 ), "]" )
+)
+model_3[["Imputation Model"]] <- "Model 3: sexual identity, age, sex, country of birth, education"
+model_3
+```
+
+#### 5.2.4. Model 4
+```{r}
+# additionally include age, sex, country of birth, education, and occupation
+
+impute_data_4 <- d_2010_selected_final %>%
+  select( sexual_identity_2010, sexual_identity_2014, age_2010, sex, country_of_birth, education_2010, occupation_2010 )
+summary( impute_data_4 )
+str( impute_data_4 )
+miss_var_summary( impute_data_4  )
+
+imp_4 <- mice( impute_data_4, m = 50, seed = 123, print = FALSE )
+summary( imp_4 )
+plot( imp_4 )
+
+long_data_4 <- complete( imp_4, action = "long", include = TRUE )
+long_data_4$identity_change <- ifelse( long_data_4$sexual_identity_2010 == long_data_4$sexual_identity_2014, 0, 1 )
+summary( long_data_4 )
+
+fit_model_4 <- with( as.mids( long_data_4 ),
+                     glm( identity_change ~ sexual_identity_2010, family = binomial( link = "log" ) ) )
+
+pooled_summary_4 <- summary( pool( fit_model_4 ), conf.int = TRUE )
+pooled_summary_4
+
+model_4 <- tibble(
+  "Estimate (log RR)" = round( pooled_summary_4[[ 2, "estimate" ]], 3 ), 
+  "SE" = round( pooled_summary_4[[ 2, "std.error" ]], 3 ),
+  "Lower CI" = round( pooled_summary_4[[ 2, "conf.low" ]], 3 ),
+  "Upper CI" = round( pooled_summary_4[[ 2, "conf.high" ]], 3 ),
+  
+  "RR [95% CI]" = paste0(
+    round( exp( pooled_summary_4[[ 2, "estimate" ]] ), 2 ), " [",
+    round( exp( pooled_summary_4[[ 2, "conf.low" ]] ), 2 ), ", ",
+    round( exp( pooled_summary_4[[ 2, "conf.high" ]] ), 2 ), "]" )
+)
+model_4[["Imputation Model"]] <- "Model 4: sexual identity, age, sex, country of birth, education, occupation"
+model_4
+```
+
+#### 5.2.5. Model 5
+```{r}
+# additionally include age, sex, country of birth, occupation
+
+impute_data_5 <- d_2010_selected_final %>%
+  select( sexual_identity_2010, sexual_identity_2014, age_2010, sex, country_of_birth, occupation_2010 )
+summary( impute_data_5 )
+str( impute_data_5 )
+miss_var_summary( impute_data_5  )
+
+imp_5 <- mice( impute_data_5, m = 50, seed = 123, print = FALSE )
+summary( imp_5 )
+plot( imp_5 )
+
+long_data_5 <- complete( imp_5, action = "long", include = TRUE )
+long_data_5$identity_change <- ifelse( long_data_5$sexual_identity_2010 == long_data_5$sexual_identity_2014, 0, 1 )
+summary( long_data_5 )
+
+fit_model_5 <- with( as.mids( long_data_5 ),
+                     glm( identity_change ~ sexual_identity_2010, family = binomial( link = "log" ) ) )
+
+pooled_summary_5 <- summary( pool( fit_model_5 ), conf.int = TRUE )
+pooled_summary_5
+
+model_5 <- tibble(
+  "Estimate (log RR)" = round( pooled_summary_5[[ 2, "estimate" ]], 3 ), 
+  "SE" = round( pooled_summary_5[[ 2, "std.error" ]], 3 ),
+  "Lower CI" = round( pooled_summary_5[[ 2, "conf.low" ]], 3 ),
+  "Upper CI" = round( pooled_summary_5[[ 2, "conf.high" ]], 3 ),
+  
+  "RR [95% CI]" = paste0(
+    round( exp( pooled_summary_5[[ 2, "estimate" ]] ), 2 ), " [",
+    round( exp( pooled_summary_5[[ 2, "conf.low" ]] ), 2 ), ", ",
+    round( exp( pooled_summary_5[[ 2, "conf.high" ]] ), 2 ), "]" )
+)
+model_5[["Imputation Model"]] <- "Model 5: sexual identity, age, sex, country of birth, occupation"
+model_5
+```
+
+```{r}
+# include age, sex, and country of birth
+impute_data_4 <- d_2010_selected_final %>%
+  select( sexual_identity_2010, identity_change, age_2010, sex, country_of_birth, education_2010, occupation_2010 ) %>%
+  mutate( identity_change = as.factor( identity_change ) )
+summary( impute_data_4 )
+str( impute_data_4 )
+miss_var_summary( impute_data_4  )
+
+imp_4 <- mice( impute_data_4, m = 50, seed = 123, print = FALSE )
+summary( imp_4 )
+plot( imp_4 )
+
+long_data_4 <- complete( imp_4, action = "long", include = TRUE )
+summary( long_data_4 )
+
+fit_model_4 <- with( as.mids( long_data_4 ),
+                     glm( identity_change ~ sexual_identity_2010, family = binomial( link = "log" ) ) )
+
+pooled_summary_4 <- summary( pool( fit_model_4 ), conf.int = TRUE )
+pooled_summary_4
+
+model_4 <- tibble(
+  "Estimate (log RR)" = round( pooled_summary_4[[ 2, "estimate" ]], 3 ), 
+  "SE" = round( pooled_summary_4[[ 2, "std.error" ]], 3 ),
+  "Lower CI" = round( pooled_summary_4[[ 2, "conf.low" ]], 3 ),
+  "Upper CI" = round( pooled_summary_4[[ 2, "conf.high" ]], 3 ),
+  
+  "RR [95% CI]" = paste0(
+    round( exp( pooled_summary_4[[ 2, "estimate" ]] ), 2 ), " [",
+    round( exp( pooled_summary_4[[ 2, "conf.low" ]] ), 2 ), ", ",
+    round( exp( pooled_summary_4[[ 2, "conf.high" ]] ), 2 ), "]" )
+)
+model_4[["Imputation Model"]] <- "Model 4: sexual identity, age, sex, country of birth, education, occupation"
+model_4
+```
+
+#### 5.2.6. Print results
+```{r}
+bind_rows(
+  model_cc, model_1, model_2, model_3, model_4, model_5
+)
+```
+
+
