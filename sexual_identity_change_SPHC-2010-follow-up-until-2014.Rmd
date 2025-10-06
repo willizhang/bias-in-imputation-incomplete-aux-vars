@@ -300,14 +300,18 @@ round(
 ```
 
 ### 5. AF4 Method
+#### 5.1. Model 2
 ```{r}
 # modeled auxiliary variables: age, sex, country of birth
 
 d_af4 <- d_2010_selected_final %>%
   mutate(
-    sex_bin = ifelse( sex == "Female", 1, 0 ),
+    sex = ifelse( sex == "Female", 1, 0 ),
     Y = identity_change )
+
 summary( d_af4 )
+table( d_af4$sex )
+table( d_af4$identity_change )
 nrow( d_af4 )
 
 set.seed( 123 )
@@ -318,14 +322,84 @@ af4_model <- af4( data = d_af4,
                   contrast_type = "ratio",
                   Y_model = Y ~ sexual_identity_2010,
                   W_model = list(
-                    sex_bin ~ sexual_identity_2010,
-                    age_2010 ~ sexual_identity_2010 + sex_bin,
-                    country_of_birth ~ sexual_identity_2010 + sex_bin + age_2010
+                    sex ~ sexual_identity_2010,
+                    age_2010 ~ sexual_identity_2010 + sex,
+                    country_of_birth ~ sexual_identity_2010 + sex + age_2010
                     ) )
 af4_model
 
 set.seed( 123 )
-get_CI( af4_model, n_boot = 100, type = 'perc' )
+get_CI( af4_model, n_boot = 1000, type = 'perc' )
+```
+
+#### 5.2. Model 3
+```{r}
+# modeled auxiliary variables: age, sex, country of birth, education
+
+set.seed( 123 )
+af4_model <- af4( data = d_af4,
+                  X_names = c( "sexual_identity_2010" ), 
+                  X_values_1 = c( "Non-heterosexual" ),
+                  X_values_2 = c( "Heterosexual" ),
+                  contrast_type = "ratio",
+                  Y_model = Y ~ sexual_identity_2010,
+                  W_model = list(
+                    sex ~ sexual_identity_2010,
+                    age_2010 ~ sexual_identity_2010 + sex,
+                    country_of_birth ~ sexual_identity_2010 + sex + age_2010,
+                    education_2010 ~ sexual_identity_2010 + sex + age_2010 + country_of_birth
+                    ) )
+af4_model
+
+set.seed( 123 )
+get_CI( af4_model, n_boot = 1000, type = 'perc' )
+```
+
+#### 5.3. Model 4
+```{r}
+# modeled auxiliary variables: age, sex, country of birth, occupation
+
+set.seed( 123 )
+af4_model <- af4( data = d_af4,
+                  X_names = c( "sexual_identity_2010" ), 
+                  X_values_1 = c( "Non-heterosexual" ),
+                  X_values_2 = c( "Heterosexual" ),
+                  contrast_type = "ratio",
+                  Y_model = Y ~ sexual_identity_2010,
+                  W_model = list(
+                    sex ~ sexual_identity_2010,
+                    age_2010 ~ sexual_identity_2010 + sex,
+                    country_of_birth ~ sexual_identity_2010 + sex + age_2010,
+                    occupation_2010 ~ sexual_identity_2010 + sex + age_2010 + country_of_birth
+                    ) )
+af4_model
+
+set.seed( 123 )
+get_CI( af4_model, n_boot = 1000, type = 'perc' )
+```
+
+#### 5.4. Model 5
+```{r}
+# modeled auxiliary variables: age, sex, country of birth, education, occupation
+
+set.seed( 123 )
+af4_model <- af4( data = d_af4,
+                  X_names = c( "sexual_identity_2010" ), 
+                  X_values_1 = c( "Non-heterosexual" ),
+                  X_values_2 = c( "Heterosexual" ),
+                  contrast_type = "ratio",
+                  Y_model = Y ~ sexual_identity_2010,
+                  W_model = list(
+                    sex ~ sexual_identity_2010,
+                    age_2010 ~ sexual_identity_2010 + sex,
+                    country_of_birth ~ sexual_identity_2010 + sex + age_2010,
+                    education_2010 ~ sexual_identity_2010 + sex + age_2010 + country_of_birth,
+                    occupation_2010 ~ sexual_identity_2010 + sex + age_2010 + country_of_birth + education_2010
+                    ) )
+af4_model
+
+set.seed( 123 )
+get_CI( af4_model, n_boot = 1000, type = 'perc' )
 ```
 
 ### 6. MICE
@@ -334,7 +408,7 @@ get_CI( af4_model, n_boot = 100, type = 'perc' )
 # modeled auxiliary variable: sexual identity in 2010
 
 mi_dataset <- d_2010_selected_final %>% 
-  select( sexual_identity_2010, identity_change, age_2010, sex, country_of_birth ) %>%
+  select( sexual_identity_2010, identity_change, age_2010, sex, country_of_birth, education_2010, occupation_2010 ) %>%
   mutate( identity_change = as.factor( identity_change ) )
 summary( mi_dataset )
 str( mi_dataset )
