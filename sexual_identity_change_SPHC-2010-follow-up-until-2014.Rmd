@@ -408,8 +408,9 @@ get_CI( af4_model, n_boot = 1000, type = 'perc' )
 # modeled auxiliary variable: sexual identity in 2010
 
 mi_dataset <- d_2010_selected_final %>% 
-  select( sexual_identity_2010, identity_change, age_2010, sex, country_of_birth, education_2010, occupation_2010 ) %>%
+  select( sexual_identity_2010, identity_change ) %>%
   mutate( identity_change = as.factor( identity_change ) )
+
 summary( mi_dataset )
 str( mi_dataset )
 miss_var_summary( mi_dataset )
@@ -417,14 +418,18 @@ miss_var_summary( mi_dataset )
 imp <- mice( mi_dataset, m = 50, seed = 123, print = FALSE )
 summary( imp )
 plot( imp )
-imp_com <- complete( imp, action = "all", include = TRUE )
+
+imp_com <- complete( imp, action = "all", include = FALSE )
+summary( imp_com$`1` )
+
 imp_com <- lapply( imp_com, function( df ) {
   df %>%
-    mutate( identity_change = as.integer( identity_change ) -1 ) } )
+    mutate( identity_change = as.integer( identity_change ) -1 ) 
+  } )
 table( imp_com$`1`$identity_change )
-imp_list <- imputationList( imp_com )
 
-design_imp <- svydesign( ids = ~ 1, data = imp_list )
+design_imp <- svydesign( ids = ~ 1, data = imputationList( imp_com ) )
+
 poisson_robust_model <- with( design_imp,
                               svyglm( identity_change ~ sexual_identity_2010, 
                                       family = quasipoisson( link = "log" ) ) )
@@ -437,12 +442,153 @@ round(
 ```
 
 #### 6.2.2. Model 2
+```{r}
+# modeled auxiliary variables: sexual identity in 2010, age, sex, country of birth
+
+mi_dataset <- d_2010_selected_final %>% 
+  select( sexual_identity_2010, identity_change, age_2010, sex, country_of_birth ) %>%
+  mutate( identity_change = as.factor( identity_change ) )
+
+summary( mi_dataset )
+str( mi_dataset )
+miss_var_summary( mi_dataset )
+
+imp <- mice( mi_dataset, m = 50, seed = 123, print = FALSE )
+summary( imp )
+plot( imp )
+
+imp_com <- complete( imp, action = "all", include = FALSE )
+summary( imp_com$`1` )
+
+imp_com <- lapply( imp_com, function( df ) {
+  df %>%
+    mutate( identity_change = as.integer( identity_change ) -1 ) 
+  } )
+table( imp_com$`1`$identity_change )
+
+design_imp <- svydesign( ids = ~ 1, data = imputationList( imp_com ) )
+
+poisson_robust_model <- with( design_imp,
+                              svyglm( identity_change ~ sexual_identity_2010, 
+                                      family = quasipoisson( link = "log" ) ) )
+
+pooled <- MIcombine( poisson_robust_model )
+summary_result <- summary( pooled )
+round(
+  exp( summary_result[ 2, c( 1, 3, 4 ) ] ),
+  2 )
+```
 
 #### 6.2.3. Model 3
+```{r}
+# modeled auxiliary variables: sexual identity in 2010, age, sex, country of birth, education
+
+mi_dataset <- d_2010_selected_final %>% 
+  select( sexual_identity_2010, identity_change, age_2010, sex, country_of_birth, education_2010 ) %>%
+  mutate( identity_change = as.factor( identity_change ) )
+
+summary( mi_dataset )
+str( mi_dataset )
+miss_var_summary( mi_dataset )
+
+imp <- mice( mi_dataset, m = 50, seed = 123, print = FALSE )
+summary( imp )
+plot( imp )
+
+imp_com <- complete( imp, action = "all", include = FALSE )
+summary( imp_com$`1` )
+
+imp_com <- lapply( imp_com, function( df ) {
+  df %>%
+    mutate( identity_change = as.integer( identity_change ) -1 ) 
+  } )
+table( imp_com$`1`$identity_change )
+
+design_imp <- svydesign( ids = ~ 1, data = imputationList( imp_com ) )
+
+poisson_robust_model <- with( design_imp,
+                              svyglm( identity_change ~ sexual_identity_2010, 
+                                      family = quasipoisson( link = "log" ) ) )
+
+pooled <- MIcombine( poisson_robust_model )
+summary_result <- summary( pooled )
+round(
+  exp( summary_result[ 2, c( 1, 3, 4 ) ] ),
+  2 )
+```
 
 #### 6.2.4. Model 4
+```{r}
+# modeled auxiliary variables: sexual identity in 2010, age, sex, country of birth, occupation
+
+mi_dataset <- d_2010_selected_final %>% 
+  select( sexual_identity_2010, identity_change, age_2010, sex, country_of_birth, occupation_2010 ) %>%
+  mutate( identity_change = as.factor( identity_change ) )
+
+summary( mi_dataset )
+str( mi_dataset )
+miss_var_summary( mi_dataset )
+
+imp <- mice( mi_dataset, m = 50, seed = 123, print = FALSE )
+summary( imp )
+plot( imp )
+
+imp_com <- complete( imp, action = "all", include = FALSE )
+summary( imp_com$`1` )
+
+imp_com <- lapply( imp_com, function( df ) {
+  df %>%
+    mutate( identity_change = as.integer( identity_change ) -1 ) 
+  } )
+table( imp_com$`1`$identity_change )
+
+design_imp <- svydesign( ids = ~ 1, data = imputationList( imp_com ) )
+
+poisson_robust_model <- with( design_imp,
+                              svyglm( identity_change ~ sexual_identity_2010, 
+                                      family = quasipoisson( link = "log" ) ) )
+
+pooled <- MIcombine( poisson_robust_model )
+summary_result <- summary( pooled )
+round(
+  exp( summary_result[ 2, c( 1, 3, 4 ) ] ),
+  2 )
+```
 
 #### 6.2.5. Model 5
+```{r}
+# modeled auxiliary variables: sexual identity in 2010, age, sex, country of birth, education, occupation
 
+mi_dataset <- d_2010_selected_final %>% 
+  select( sexual_identity_2010, identity_change, age_2010, sex, country_of_birth, education_2010, occupation_2010 ) %>%
+  mutate( identity_change = as.factor( identity_change ) )
 
+summary( mi_dataset )
+str( mi_dataset )
+miss_var_summary( mi_dataset )
 
+imp <- mice( mi_dataset, m = 50, seed = 123, print = FALSE )
+summary( imp )
+plot( imp )
+
+imp_com <- complete( imp, action = "all", include = FALSE )
+summary( imp_com$`1` )
+
+imp_com <- lapply( imp_com, function( df ) {
+  df %>%
+    mutate( identity_change = as.integer( identity_change ) -1 ) 
+  } )
+table( imp_com$`1`$identity_change )
+
+design_imp <- svydesign( ids = ~ 1, data = imputationList( imp_com ) )
+
+poisson_robust_model <- with( design_imp,
+                              svyglm( identity_change ~ sexual_identity_2010, 
+                                      family = quasipoisson( link = "log" ) ) )
+
+pooled <- MIcombine( poisson_robust_model )
+summary_result <- summary( pooled )
+round(
+  exp( summary_result[ 2, c( 1, 3, 4 ) ] ),
+  2 )
+```
