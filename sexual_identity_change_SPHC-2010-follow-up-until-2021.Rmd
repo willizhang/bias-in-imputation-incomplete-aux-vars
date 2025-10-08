@@ -1,5 +1,5 @@
 ---
-title: "Sexual Identity Change, SPHC 2010 Followed Up Until 2014"
+title: "Sexual Identity Change, SPHC 2010 Followed Up Until 2021"
 author: Willi Zhang, Maya Mathur
 email: willi.zhang@ki.se
 output: html_notebook
@@ -21,57 +21,7 @@ library(mice)
 library(mitools)
 ```
 
-### 2. Sexual identities at T1 and T2
-```{r}
-theme_set( theme_dag() + theme( strip.text = element_blank() ) )
-
-coords <- tibble::tribble(
-  ~ name,                          ~ x,     ~ y,
-  "sexual_identity_t1",            0.25,       0.50,
-  "sexual_identity_t2",            0.75,       0.50,
-  "sexual_identity_t2_incomplete", 0.85,       0.50,
-  "r_sexual_identity_t2",          0.75,       0.25,
-  "occupation",                    0.50,       0.25,
-  "occupation_incomplete",         0.70,       0.10,
-  "r_occupation",                  0.50,       0.10,
-  "education",                     0.40,       0.75
-  )
-
-set.seed( 123 )
-sexual_identity_change_dag <- dagify(
-  
-  sexual_identity_t2 ~ sexual_identity_t1 + occupation + education,
-  occupation ~ sexual_identity_t1 + education,
-  education ~ sexual_identity_t1,
-  occupation_incomplete ~ occupation + r_occupation,
-  sexual_identity_t2_incomplete ~ sexual_identity_t2 + r_sexual_identity_t2,
-  r_sexual_identity_t2 ~ sexual_identity_t1 + occupation + education,
-  r_occupation ~ sexual_identity_t1 + education,
-  
-  labels = c(
-    "sexual_identity_t1" = "sexual_identity_t1",
-    "sexual_identity_t2" = "sexual_identity_t2",
-    "sexual_identity_t2_incomplete" = "sexual_identity_t2_incomplete",
-    "r_sexual_identity_t2" = "r_sexual_identity_t2",
-    "occupation" = "occupation",
-    "occupation_incomplete" = "occupation_incomplete",
-    "r_occupation" = "r_occupation",
-    "education" = "education"
-    ),
-  
-  coords = coords
-  
-  )
-
-p1 <- ggdag( sexual_identity_change_dag, 
-             text = FALSE, 
-             use_labels = "label"
-             )
-p1
-#ggsave( "dag_sexual_identity_change.jpeg", plot = p1, width = 10, height = 7, dpi = 600 )
-```
-
-### 3. SPHC 2010, followed up to 2014
+### 2. SPHC 2010, followed up to 2021
 ```{r}
 load('/Volumes/projects/LGBT Project data/d_2010.RData')
 
@@ -82,14 +32,14 @@ d_2010$sexual_identity_2010 <- factor( ifelse( d_2010$F10U87G78 == 1, "Heterosex
                                        levels = c( "Heterosexual", "Non-heterosexual" ) )
 table( d_2010$sexual_identity_2010, useNA = "always" )
 
-# sexual identity in 2014
-table( d_2010$F14F103, useNA = "always" )
-d_2010$sexual_identity_2014 <- factor( ifelse( d_2010$F14F103 == 1, "Heterosexual", "Non-heterosexual" ),
+# sexual identity in 2021
+table( d_2010$F21F91, useNA = "always" )
+d_2010$sexual_identity_2021 <- factor( ifelse( d_2010$F21F91 == 1, "Heterosexual", "Non-heterosexual" ),
                                        levels = c( "Heterosexual", "Non-heterosexual" ) )
-table( d_2010$sexual_identity_2014, useNA = "always" )
+table( d_2010$sexual_identity_2021, useNA = "always" )
 
 # change in sexual identity
-d_2010$identity_change <- ifelse( d_2010$sexual_identity_2010 == d_2010$sexual_identity_2014, 0, 1 )
+d_2010$identity_change <- ifelse( d_2010$sexual_identity_2010 == d_2010$sexual_identity_2021, 0, 1 )
 table( d_2010$identity_change, useNA = "always" )
 
 # age
@@ -149,28 +99,28 @@ table( d_2010$occupation_2010, useNA = "always" )
 
 
 d_2010_prelim <- d_2010 %>% 
-  select( "sexual_identity_2010", "sexual_identity_2014", "identity_change", "age_2010", "sex", "country_of_birth", "education_2010", "occupation_2010" )
+  select( "sexual_identity_2010", "sexual_identity_2021", "identity_change", "age_2010", "sex", "country_of_birth", "education_2010", "occupation_2010" )
 summary( d_2010_prelim )
-miss_var_summary( d_2010_prelim ) # 41.2% in sexual_identity_2014, 18.3% in occupation_2010, 3.8% in sexual_identity_2010, 0.7% in education_2010
+miss_var_summary( d_2010_prelim ) # 58.0% in sexual_identity_2021, 18.3% in occupation_2010, 3.8% in sexual_identity_2010, 0.7% in education_2010
 
-# among participants in 2014 (N = 18,518), 431 (2.3%) did not report sexual identity. Therefore, the missingness in sexual_identity_2014 was primarily due to loss to follow-up
+# among participants in 2021 (N = 13,613), 683 (5.0%) did not report sexual identity. Therefore, the missingness in sexual_identity_2021 was primarily due to loss to follow-up
 
 # select study sample
 d_2010_selected <- d_2010_prelim %>%
   filter( age_2010 >= 25 & age_2010 <= 45 ) # select participants aged 25-45 at baseline, because this age group, relative to younger individuals, would be relatively stable socioeconomically
 summary( d_2010_selected )
 nrow( d_2010_selected ) # 10,063
-miss_var_summary( d_2010_selected ) # 45.9% in sexual_identity_2014, 6.7% in occupation_2010, 2.3% in sexual_identity_2010, 0.3% in education_2010
+miss_var_summary( d_2010_selected ) # 59.3% in sexual_identity_2021, 6.7% in occupation_2010, 2.3% in sexual_identity_2010, 0.3% in education_2010
 
 d_2010_selected_final <- d_2010_selected %>% 
   filter( !is.na( sexual_identity_2010 ), !is.na( education_2010 ) ) # remove 2.3% missingness in sexual_identity_2010 and 0.3% in education_2010
 summary( d_2010_selected_final )
 nrow( d_2010_selected_final ) # 9,806
-miss_var_summary( d_2010_selected_final ) # 45.1% in sexual_identity_2014, 6.3% in occupation_2010
+miss_var_summary( d_2010_selected_final ) # 58.7% in sexual_identity_2021, 6.3% in occupation_2010
 
 
 # characteristics table
-explanatory =  c( "sexual_identity_2014", "sex", "age_2010", "country_of_birth", "education_2010", "occupation_2010" )
+explanatory =  c( "sexual_identity_2021", "sex", "age_2010", "country_of_birth", "education_2010", "occupation_2010" )
 dependent = "sexual_identity_2010"
 
 d_2010_table <- d_2010_selected_final %>%
@@ -185,20 +135,20 @@ d_2010_table <- d_2010_selected_final %>%
 d_2010_table
 
 
-# correlation of sexual identities in 2010 and 2014
-ggplot( d_2010_selected_final %>% filter( !is.na( sexual_identity_2014 ) ),
-        aes( x = sexual_identity_2010, fill = sexual_identity_2014 ) ) +
+# correlation of sexual identities in 2010 and 2021
+ggplot( d_2010_selected_final %>% filter( !is.na( sexual_identity_2021 ) ),
+        aes( x = sexual_identity_2010, fill = sexual_identity_2021 ) ) +
   geom_bar( position = "fill" ) +
   scale_y_continuous( labels = scales::percent ) +
-  labs( x = "Sexual Identity in 2010", y = "Percentage", fill = "Sexual Identity in 2014" ) +
+  labs( x = "Sexual Identity in 2010", y = "Percentage", fill = "Sexual Identity in 2021" ) +
   theme_classic()
 
-# correlation of sexual identity in 2010 and missingness of sexual identity in 2014
+# correlation of sexual identity in 2010 and missingness of sexual identity in 2021
 ggplot( d_2010_selected_final,
-        aes( x = sexual_identity_2010, fill = is.na( sexual_identity_2014 ) ) ) +
+        aes( x = sexual_identity_2010, fill = is.na( sexual_identity_2021 ) ) ) +
   geom_bar( position = "fill" ) +
   scale_y_continuous( labels = scales::percent ) +
-  labs( x = "Sexual Identity in 2010", y = "Percentage", fill = "Missingness of Sexual Identity in 2014" ) +
+  labs( x = "Sexual Identity in 2010", y = "Percentage", fill = "Missingness of Sexual Identity in 2021" ) +
   theme_classic()
 
 # correlation of sexual identity in 2010 and education
@@ -225,21 +175,21 @@ ggplot( d_2010_selected_final,
   labs( x = "Sexual Identity in 2010", y = "Percentage", fill = "Missingness of Occupation" ) +
   theme_classic()
 
-# correlation of education and sexual identity in 2014
+# correlation of education and sexual identity in 2021
 ggplot( d_2010_selected_final %>% 
-          filter( !is.na( sexual_identity_2014 ) ),
-        aes( x = education_2010, fill = sexual_identity_2014 ) ) +
+          filter( !is.na( sexual_identity_2021 ) ),
+        aes( x = education_2010, fill = sexual_identity_2021 ) ) +
   geom_bar( position = "fill" ) +
   scale_y_continuous( labels = scales::percent ) +
-  labs( x = "Education Year", y = "Percentage", fill = "Sexual Identity in 2014" ) +
+  labs( x = "Education Year", y = "Percentage", fill = "Sexual Identity in 2021" ) +
   theme_classic()
 
-# correlation of education and missingness of sexual identity in 2014
+# correlation of education and missingness of sexual identity in 2021
 ggplot( d_2010_selected_final,
-        aes( x = education_2010, fill = is.na( sexual_identity_2014 ) ) ) +
+        aes( x = education_2010, fill = is.na( sexual_identity_2021 ) ) ) +
   geom_bar( position = "fill" ) +
   scale_y_continuous( labels = scales::percent ) +
-  labs( x = "Education Year", y = "Percentage", fill = "Missingness of Sexual Identity in 2014" ) +
+  labs( x = "Education Year", y = "Percentage", fill = "Missingness of Sexual Identity in 2021" ) +
   theme_classic()
 
 # correlation of education and occupation
@@ -258,26 +208,26 @@ ggplot( d_2010_selected_final,
   labs( x = "Education Year", y = "Percentage", fill = "Missingness of Occupation" ) +
   theme_classic()
 
-# correlation of occupation and sexual identity in 2014
+# correlation of occupation and sexual identity in 2021
 ggplot( d_2010_selected_final %>% 
-          filter( !is.na( sexual_identity_2014 ) & !is.na( occupation_2010 ) ),
-        aes( x = sexual_identity_2014, fill = occupation_2010 ) ) +
+          filter( !is.na( sexual_identity_2021 ) & !is.na( occupation_2010 ) ),
+        aes( x = sexual_identity_2021, fill = occupation_2010 ) ) +
   geom_bar( position = "fill" ) +
   scale_y_continuous( labels = scales::percent ) +
-  labs( x = "Sexual Identity in 2014", y = "Percentage", fill = "Occupation" ) +
+  labs( x = "Sexual Identity in 2021", y = "Percentage", fill = "Occupation" ) +
   theme_classic()
 
-# correlation of occupation and missingness of sexual identity in 2014
+# correlation of occupation and missingness of sexual identity in 2021
 ggplot( d_2010_selected_final %>%
           filter( !is.na( occupation_2010 ) ),
-        aes( x = occupation_2010, fill = is.na( sexual_identity_2014 ) ) ) +
+        aes( x = occupation_2010, fill = is.na( sexual_identity_2021 ) ) ) +
   geom_bar( position = "fill" ) +
   scale_y_continuous( labels = scales::percent ) +
-  labs( x = "Occupation", y = "Percentage", fill = "Missingness of Sexual Identity in 2014" ) +
+  labs( x = "Occupation", y = "Percentage", fill = "Missingness of Sexual Identity in 2021" ) +
   theme_classic()
 ```
 
-### 4. Complete-case analysis
+### 3. Complete-case analysis
 ```{r}
 d_cc <- d_2010_selected_final %>% 
   select( sexual_identity_2010, identity_change ) %>%
@@ -299,8 +249,8 @@ round(
   2 )
 ```
 
-### 5. AF4 Method
-#### 5.1. Model 2
+### 4. AF4 Method
+#### 4.1. Model 2
 ```{r}
 # modeled auxiliary variables: age, sex, country of birth
 
@@ -332,7 +282,7 @@ set.seed( 123 )
 get_CI( af4_model, n_boot = 1000, type = 'perc' )
 ```
 
-#### 5.2. Model 3
+#### 4.2. Model 3
 ```{r}
 # modeled auxiliary variables: age, sex, country of birth, education
 
@@ -355,7 +305,7 @@ set.seed( 123 )
 get_CI( af4_model, n_boot = 1000, type = 'perc' )
 ```
 
-#### 5.3. Model 4
+#### 4.3. Model 4
 ```{r}
 # modeled auxiliary variables: age, sex, country of birth, occupation
 
@@ -378,7 +328,7 @@ set.seed( 123 )
 get_CI( af4_model, n_boot = 1000, type = 'perc' )
 ```
 
-#### 5.4. Model 5
+#### 4.4. Model 5
 ```{r}
 # modeled auxiliary variables: age, sex, country of birth, education, occupation
 
@@ -402,8 +352,8 @@ set.seed( 123 )
 get_CI( af4_model, n_boot = 1000, type = 'perc' )
 ```
 
-### 6. MICE
-#### 6.1 Model 1
+### 5. MICE
+#### 5.1 Model 1
 ```{r}
 # modeled auxiliary variable: sexual identity in 2010
 
@@ -415,7 +365,7 @@ summary( mi_dataset )
 str( mi_dataset )
 miss_var_summary( mi_dataset )
 
-imp <- mice( mi_dataset, m = 50, seed = 123, print = FALSE )
+imp <- mice( mi_dataset, m = 70, seed = 123, print = FALSE )
 summary( imp )
 plot( imp )
 
@@ -441,7 +391,7 @@ round(
   2 )
 ```
 
-#### 6.2. Model 2
+#### 5.2. Model 2
 ```{r}
 # modeled auxiliary variables: sexual identity in 2010, age, sex, country of birth
 
@@ -453,7 +403,7 @@ summary( mi_dataset )
 str( mi_dataset )
 miss_var_summary( mi_dataset )
 
-imp <- mice( mi_dataset, m = 50, seed = 123, print = FALSE )
+imp <- mice( mi_dataset, m = 70, seed = 123, print = FALSE )
 summary( imp )
 plot( imp )
 
@@ -479,7 +429,7 @@ round(
   2 )
 ```
 
-#### 6.3. Model 3
+#### 5.3. Model 3
 ```{r}
 # modeled auxiliary variables: sexual identity in 2010, age, sex, country of birth, education
 
@@ -491,7 +441,7 @@ summary( mi_dataset )
 str( mi_dataset )
 miss_var_summary( mi_dataset )
 
-imp <- mice( mi_dataset, m = 50, seed = 123, print = FALSE )
+imp <- mice( mi_dataset, m = 70, seed = 123, print = FALSE )
 summary( imp )
 plot( imp )
 
@@ -517,7 +467,7 @@ round(
   2 )
 ```
 
-#### 6.4. Model 4
+#### 5.4. Model 4
 ```{r}
 # modeled auxiliary variables: sexual identity in 2010, age, sex, country of birth, occupation
 
@@ -529,7 +479,7 @@ summary( mi_dataset )
 str( mi_dataset )
 miss_var_summary( mi_dataset )
 
-imp <- mice( mi_dataset, m = 50, seed = 123, print = FALSE )
+imp <- mice( mi_dataset, m = 70, seed = 123, print = FALSE )
 summary( imp )
 plot( imp )
 
@@ -555,7 +505,7 @@ round(
   2 )
 ```
 
-#### 6.5. Model 5
+#### 5.5. Model 5
 ```{r}
 # modeled auxiliary variables: sexual identity in 2010, age, sex, country of birth, education, occupation
 
@@ -567,7 +517,7 @@ summary( mi_dataset )
 str( mi_dataset )
 miss_var_summary( mi_dataset )
 
-imp <- mice( mi_dataset, m = 50, seed = 123, print = FALSE )
+imp <- mice( mi_dataset, m = 70, seed = 123, print = FALSE )
 summary( imp )
 plot( imp )
 
